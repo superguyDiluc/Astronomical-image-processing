@@ -22,12 +22,80 @@ ApplicationWindow {
             spacing: 4
 
             ToolButton {
-                icon.name: "folder-open"
-                text: qsTr("Load FITS")
-                onClicked: fileDialog.open()
+                icon.source: "asserts/list.svg"
+                icon.width: 20
+                icon.height: 20
+                onClicked: sidebar.open()
+                Accessible.name: qsTr("Open sidebar")
             }
 
-            Item { Layout.fillWidth: true }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("FITS Viewer")
+                font.pointSize: 12
+                font.weight: Font.Medium
+                elide: Text.ElideRight
+            }
+        }
+    }
+
+    Drawer {
+        id: sidebar
+        width: Math.min(root.width * 0.7, 280)
+        height: root.height
+        edge: Qt.LeftEdge
+        modal: true
+        dim: true
+
+        topPadding: 0
+        bottomPadding: 0
+        leftPadding: 0
+        rightPadding: 0
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 0
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                spacing: 0
+
+                Label {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 16
+                    text: qsTr("Tools")
+                    font.pointSize: 14
+                    font.weight: Font.Medium
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                ToolButton {
+                    icon.name: "close"
+                    icon.width: 18
+                    icon.height: 18
+                    onClicked: sidebar.close()
+                    Accessible.name: qsTr("Close sidebar")
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                color: Material.color(Material.Grey, Material.Shade300)
+            }
+
+            ItemDelegate {
+                Layout.fillWidth: true
+                icon.name: "folder-open"
+                text: qsTr("Load FITS")
+                onClicked: {
+                    fileDialog.open()
+                    sidebar.close()
+                }
+            }
+
+            Item { Layout.fillHeight: true }
         }
     }
 
@@ -49,15 +117,36 @@ ApplicationWindow {
 
         Pane {
             Layout.fillWidth: true
-            Layout.preferredHeight: 28
-            padding: 4
+            Layout.preferredHeight: 32
+            padding: 0
+            topPadding: 0
+            bottomPadding: 0
+            leftPadding: 8
+            rightPadding: 8
 
             Material.elevation: 0
 
-            Label {
-                anchors.verticalCenter: parent.verticalCenter
-                text: qsTr("Ready")
-                font.pointSize: 10
+            RowLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                Item { Layout.fillWidth: true }
+
+                Rectangle {
+                    Layout.preferredWidth: 8
+                    Layout.preferredHeight: 8
+                    radius: 4
+                    color: "#4CAF50"
+
+                    Accessible.ignored: true
+                }
+
+                Label {
+                    Layout.leftMargin: 6
+                    text: qsTr("Ready")
+                    font.pointSize: 10
+                    color: Material.color(Material.Grey, Material.Shade700)
+                }
             }
         }
     }
