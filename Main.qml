@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import test
 
 ApplicationWindow {
     id: root
@@ -15,6 +16,14 @@ ApplicationWindow {
 
     Material.theme: Material.Light
     Material.accent: Material.Indigo
+
+    FitsManager {
+        id: fitsManager
+        onErrorMessageChanged: {
+            if (errorMessage.length > 0)
+                errorSnackbar.open()
+        }
+    }
 
     header: ToolBar {
         RowLayout {
@@ -112,6 +121,23 @@ ApplicationWindow {
                 text: qsTr("Open a FITS file to begin")
                 font.pointSize: 14
                 color: Material.color(Material.Grey)
+                visible: fitsManager.imageSource.length === 0
+            }
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 8
+                source: fitsManager.imageSource
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                visible: fitsManager.imageSource.length > 0
+                cache: false
+
+                BusyIndicator {
+                    anchors.centerIn: parent
+                    running: fitsManager.status === "loading"
+                    visible: running
+                }
             }
         }
 
@@ -136,14 +162,18 @@ ApplicationWindow {
                     Layout.preferredWidth: 8
                     Layout.preferredHeight: 8
                     radius: 4
-                    color: "#4CAF50"
+                    color: fitsManager.status === "error" ? "#F44336"
+                         : fitsManager.status === "loading" ? "#FF9800"
+                         : "#4CAF50"
 
                     Accessible.ignored: true
                 }
 
                 Label {
                     Layout.leftMargin: 6
-                    text: qsTr("Ready")
+                    text: fitsManager.status === "error" ? qsTr("Error")
+                        : fitsManager.status === "loading" ? qsTr("Loading...")
+                        : qsTr("Ready")
                     font.pointSize: 10
                     color: Material.color(Material.Grey, Material.Shade700)
                 }
@@ -161,9 +191,70 @@ ApplicationWindow {
                 id: dialog
                 title: qsTr("Select FITS file")
                 nameFilters: [qsTr("FITS files (*.fits *.fit *.fts)")]
-                onAccepted: fileDialog.active = false
+                onAccepted: {
+                    fitsManager.loadFile(selectedFile)
+                    fileDialog.active = false
+                }
                 onRejected: fileDialog.active = false
                 Component.onCompleted: open()
+            }
+        }
+    }
+
+    Loader {
+        id: errorSnackbar
+        active: false
+        function open() { active = true }
+
+        sourceComponent: Component {
+            Popup {
+                id: snackbar
+                parent: Overlay.overlay
+                x: (parent.width - width) / 2
+                y: parent.height - height - 48
+                width: Math.min(parent.width - 32, 480)
+                modal: false
+                closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+                padding: 0
+
+                onClosed: {
+                    fitsManager.clearError()
+                    errorSnackbar.active = false
+                }
+                Component.onCompleted: open()
+
+                Timer {
+                    interval: 6000
+                    running: snackbar.visible
+                    onTriggered: snackbar.close()
+                }
+
+                Pane {
+                    anchors.fill: parent
+                    Material.elevation: 6
+
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 8
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: fitsManager.errorMessage
+                            font.pointSize: 10
+                            color: "#F44336"
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 3
+                            elide: Text.ElideRight
+                        }
+
+                        ToolButton {
+                            text: qsTr("Dismiss")
+                            flat: true
+                            onClicked: snackbar.close()
+                            Material.foreground: Material.accent
+                        }
+                    }
+                }
             }
         }
     }
