@@ -15,6 +15,7 @@ FetchContent_Declare(
 )
 set(UTILS OFF CACHE BOOL "" FORCE)
 set(TESTS OFF CACHE BOOL "" FORCE)
+set(USE_BZIP2 OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(cfitsio)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 QuickLayouts)
@@ -54,6 +55,13 @@ target_link_libraries(apptest
 )
 
 target_include_directories(apptest PRIVATE ${cfitsio_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Copy cfitsio DLL next to the executable after build
+add_custom_command(TARGET apptest POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:cfitsio>
+        $<TARGET_FILE_DIR:apptest>
+)
 
 install(TARGETS apptest
     BUNDLE DESTINATION .
