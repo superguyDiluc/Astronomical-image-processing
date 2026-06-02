@@ -18,6 +18,7 @@ ApplicationWindow {
     Material.accent: Material.Indigo
 
     readonly property bool hasImage: fitsManager.imageSource.length > 0
+    property bool grayPanelOpen: false
 
     FitsManager {
         id: fitsManager
@@ -194,9 +195,38 @@ ApplicationWindow {
                 }
             }
 
-            // -- Right activity bar (placeholder, Task 2 fills this) --
+            // -- Right activity bar --
+            Pane {
+                Layout.fillHeight: true
+                Layout.preferredWidth: 40
+                visible: root.hasImage
+                padding: 4
+                Material.elevation: 0
 
-            // -- Right panel (placeholder, Task 4 fills this) --
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 4
+
+                    ToolButton {
+                        Layout.alignment: Qt.AlignHCenter
+                        icon.name: "tonality"
+                        icon.width: 22
+                        icon.height: 22
+                        checked: root.grayPanelOpen
+                        checkable: true
+                        onToggled: root.grayPanelOpen = checked
+                        Accessible.name: qsTr("Gray level transform")
+
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Gray Level Transform")
+                        ToolTip.delay: 500
+                    }
+
+                    Item { Layout.fillHeight: true }
+                }
+            }
+
+            // -- Gray transform right panel (placeholder, Task 4 fills this) --
         }
 
         Pane {
