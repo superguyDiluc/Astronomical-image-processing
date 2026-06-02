@@ -31,6 +31,9 @@ qt_add_qml_module(apptest
     URI test
     QML_FILES
         Main.qml
+    SOURCES
+        src/FitsManager.h
+        src/FitsManager.cpp
     RESOURCES
         asserts/list.svg
 )
@@ -47,8 +50,10 @@ set_target_properties(apptest PROPERTIES
 )
 
 target_link_libraries(apptest
-    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::QuickLayouts
+    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::QuickLayouts cfitsio
 )
+
+target_include_directories(apptest PRIVATE ${cfitsio_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 install(TARGETS apptest
     BUNDLE DESTINATION .
