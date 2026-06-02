@@ -17,6 +17,8 @@ ApplicationWindow {
     Material.theme: Material.Light
     Material.accent: Material.Indigo
 
+    readonly property bool hasImage: fitsManager.imageSource.length > 0
+
     FitsManager {
         id: fitsManager
         onErrorMessageChanged: {
@@ -112,33 +114,89 @@ ApplicationWindow {
         anchors.fill: parent
         spacing: 0
 
-        Item {
+        RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            spacing: 0
 
-            Label {
-                anchors.centerIn: parent
-                text: qsTr("Open a FITS file to begin")
-                font.pointSize: 14
-                color: Material.color(Material.Grey)
-                visible: fitsManager.imageSource.length === 0
-            }
+            // -- Image viewport with zoom & pan --
+            Item {
+                id: viewportContainer
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
-            Image {
-                anchors.fill: parent
-                anchors.margins: 8
-                source: fitsManager.imageSource
-                fillMode: Image.PreserveAspectFit
-                asynchronous: true
-                visible: fitsManager.imageSource.length > 0
-                cache: false
-
-                BusyIndicator {
+                Label {
                     anchors.centerIn: parent
-                    running: fitsManager.status === "loading"
-                    visible: running
+                    text: qsTr("Open a FITS file to begin")
+                    font.pointSize: 14
+                    color: Material.color(Material.Grey)
+                    visible: !root.hasImage
+                }
+
+                Flickable {
+                    id: flickable
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    visible: root.hasImage
+                    clip: true
+                    contentWidth: fitsImage.width * fitsImage.scale
+                    contentHeight: fitsImage.height * fitsImage.scale
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Image {
+                        id: fitsImage
+                        source: fitsManager.imageSource
+                        asynchronous: true
+                        cache: false
+                        fillMode: Image.PreserveAspectFit
+                        transformOrigin: Item.TopLeft
+
+                        readonly property real fitScale: Math.min(
+                            flickable.width / Math.max(sourceSize.width, 1),
+                            flickable.height / Math.max(sourceSize.height, 1),
+                            1.0)
+
+                        width: sourceSize.width
+                        height: sourceSize.height
+                        scale: fitScale
+
+                        onStatusChanged: {
+                            if (status === Image.Ready)
+                                scale = fitScale
+                        }
+                    }
+
+                    WheelHandler {
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: function(event) {
+                            let factor = event.angleDelta.y > 0 ? 1.15 : (1 / 1.15)
+                            let newScale = Math.max(0.05,
+                                Math.min(fitsImage.scale * factor, 20.0))
+                            fitsImage.scale = newScale
+                        }
+                    }
+
+                    BusyIndicator {
+                        anchors.centerIn: parent
+                        running: fitsManager.status === "loading"
+                        visible: running
+                    }
+                }
+
+                // Double-click to reset zoom
+                TapHandler {
+                    enabled: root.hasImage
+                    onDoubleTapped: {
+                        fitsImage.scale = fitsImage.fitScale
+                        flickable.contentX = 0
+                        flickable.contentY = 0
+                    }
                 }
             }
+
+            // -- Right activity bar (placeholder, Task 2 fills this) --
+
+            // -- Right panel (placeholder, Task 4 fills this) --
         }
 
         Pane {
