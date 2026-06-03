@@ -7,8 +7,20 @@ ColumnLayout {
 
     required property var fitsManager
     property alias closeButton: closeButton
+    readonly property real pixelRange: Math.max(0, fitsManager.pixelMax - fitsManager.pixelMin)
+    readonly property real sliderStep: pixelRange > 10 ? 1.0 : Math.max(pixelRange / 1000, 0.000001)
 
     signal closeRequested()
+
+    function formatValue(value) {
+        if (!isFinite(value))
+            return qsTr("n/a")
+        if (Math.abs(value) >= 100)
+            return value.toFixed(0)
+        if (Math.abs(value) >= 1)
+            return value.toFixed(3)
+        return value.toFixed(6)
+    }
 
     spacing: 0
 
@@ -65,7 +77,7 @@ ColumnLayout {
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: Math.round(minSlider.value).toString()
+                    text: root.formatValue(minSlider.value)
                     font.pointSize: 10
                     color: Material.color(Material.Grey, Material.Shade600)
                 }
@@ -77,7 +89,7 @@ ColumnLayout {
                 from: root.fitsManager.pixelMin
                 to: root.fitsManager.pixelMax
                 value: root.fitsManager.minValue
-                stepSize: 1.0
+                stepSize: root.sliderStep
                 onMoved: root.fitsManager.minValue = Math.min(value, root.fitsManager.maxValue)
             }
         }
@@ -106,7 +118,7 @@ ColumnLayout {
                 Item { Layout.fillWidth: true }
 
                 Label {
-                    text: Math.round(maxSlider.value).toString()
+                    text: root.formatValue(maxSlider.value)
                     font.pointSize: 10
                     color: Material.color(Material.Grey, Material.Shade600)
                 }
@@ -118,7 +130,7 @@ ColumnLayout {
                 from: root.fitsManager.pixelMin
                 to: root.fitsManager.pixelMax
                 value: root.fitsManager.maxValue
-                stepSize: 1.0
+                stepSize: root.sliderStep
                 onMoved: root.fitsManager.maxValue = Math.max(value, root.fitsManager.minValue)
             }
         }

@@ -405,14 +405,17 @@ void FitsManager::autoAdjust()
     setStatus(QStringLiteral("loading"));
 
     FitsData data = m_currentData;
+    float pixelMin = m_pixelMin;
     float pixelMax = m_pixelMax;
-    m_displayWatcher.setFuture(QtConcurrent::run([data = std::move(data), pixelMax]() mutable {
+    m_displayWatcher.setFuture(QtConcurrent::run([data = std::move(data), pixelMin, pixelMax]() mutable {
         DisplayResult result = buildAutoAdjustResult(data);
         if (!result.errorMessage.isEmpty())
             return result;
         result.maxValue = std::min(result.maxValue, pixelMax);
-        if (result.maxValue <= result.minValue)
-            result.maxValue = result.minValue + 1.0f;
+        if (result.maxValue <= result.minValue) {
+            float minRange = std::max((pixelMax - pixelMin) * 0.001f, 0.000001f);
+            result.maxValue = std::min(pixelMax, result.minValue + minRange);
+        }
         result.image = convertToQImage(data, result.minValue, result.maxValue);
         return result;
     }));
