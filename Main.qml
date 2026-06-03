@@ -19,6 +19,7 @@ ApplicationWindow {
 
     readonly property bool hasImage: fitsManager.imageSource.length > 0
     property bool grayPanelOpen: false
+    readonly property bool compactLayout: width < 760
 
     FitsManager {
         id: fitsManager
@@ -143,6 +144,26 @@ ApplicationWindow {
                     contentWidth: fitsImage.width * fitsImage.scale
                     contentHeight: fitsImage.height * fitsImage.scale
                     boundsBehavior: Flickable.StopAtBounds
+                    interactive: root.hasImage
+
+                    function resetView() {
+                        fitsImage.scale = fitsImage.fitScale
+                        contentX = 0
+                        contentY = 0
+                    }
+
+                    function zoomAt(point, factor) {
+                        let oldScale = fitsImage.scale
+                        let newScale = Math.max(0.05, Math.min(oldScale * factor, 20.0))
+                        if (Math.abs(newScale - oldScale) < 0.0001)
+                            return
+
+                        let imageX = (contentX + point.x) / oldScale
+                        let imageY = (contentY + point.y) / oldScale
+                        fitsImage.scale = newScale
+                        contentX = Math.max(0, Math.min(imageX * newScale - point.x, contentWidth - width))
+                        contentY = Math.max(0, Math.min(imageY * newScale - point.y, contentHeight - height))
+                    }
 
                     Image {
                         id: fitsImage
@@ -171,9 +192,7 @@ ApplicationWindow {
                         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                         onWheel: function(event) {
                             let factor = event.angleDelta.y > 0 ? 1.15 : (1 / 1.15)
-                            let newScale = Math.max(0.05,
-                                Math.min(fitsImage.scale * factor, 20.0))
-                            fitsImage.scale = newScale
+                            flickable.zoomAt(Qt.point(event.x, event.y), factor)
                         }
                     }
 
@@ -188,9 +207,7 @@ ApplicationWindow {
                 TapHandler {
                     enabled: root.hasImage
                     onDoubleTapped: {
-                        fitsImage.scale = fitsImage.fitScale
-                        flickable.contentX = 0
-                        flickable.contentY = 0
+                        flickable.resetView()
                     }
                 }
             }
@@ -230,7 +247,7 @@ ApplicationWindow {
             Pane {
                 Layout.fillHeight: true
                 Layout.preferredWidth: 280
-                visible: root.grayPanelOpen
+                visible: root.grayPanelOpen && !root.compactLayout
                 padding: 0
                 Material.elevation: 1
 
@@ -445,6 +462,165 @@ ApplicationWindow {
                 onRejected: fileDialog.active = false
                 Component.onCompleted: open()
             }
+        }
+    }
+
+    Drawer {
+        id: compactGrayPanel
+        width: Math.min(root.width * 0.85, 320)
+        height: root.height
+        edge: Qt.RightEdge
+        modal: true
+        dim: true
+        visible: root.compactLayout && root.grayPanelOpen
+        onClosed: root.grayPanelOpen = false
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 0
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 44
+                spacing: 0
+
+                Label {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 16
+                    text: qsTr("Gray Level Transform")
+                    font.pointSize: 12
+                    font.weight: Font.Medium
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                ToolButton {
+                    icon.name: "close"
+                    icon.width: 16
+                    icon.height: 16
+                    onClicked: root.grayPanelOpen = false
+                    Accessible.name: qsTr("Close panel")
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                color: Material.color(Material.Grey, Material.Shade300)
+            }
+
+            Pane {
+                Layout.fillWidth: true
+                padding: 16
+                topPadding: 12
+                bottomPadding: 4
+                Material.elevation: 0
+
+                ColumnLayout {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: 4
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            text: qsTr("Min")
+                            font.pointSize: 10
+                        }
+                        Item { Layout.fillWidth: true }
+                        Label {
+                            text: Math.round(compactMinSlider.value).toString()
+                            font.pointSize: 10
+                            color: Material.color(Material.Grey, Material.Shade600)
+                        }
+                    }
+
+                    Slider {
+                        id: compactMinSlider
+                        Layout.fillWidth: true
+                        from: fitsManager.pixelMin
+                        to: fitsManager.pixelMax
+                        value: fitsManager.minValue
+                        stepSize: 1.0
+                        onMoved: fitsManager.minValue = value
+                    }
+                }
+            }
+
+            Pane {
+                Layout.fillWidth: true
+                padding: 16
+                topPadding: 4
+                bottomPadding: 12
+                Material.elevation: 0
+
+                ColumnLayout {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: 4
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            text: qsTr("Max")
+                            font.pointSize: 10
+                        }
+                        Item { Layout.fillWidth: true }
+                        Label {
+                            text: Math.round(compactMaxSlider.value).toString()
+                            font.pointSize: 10
+                            color: Material.color(Material.Grey, Material.Shade600)
+                        }
+                    }
+
+                    Slider {
+                        id: compactMaxSlider
+                        Layout.fillWidth: true
+                        from: fitsManager.pixelMin
+                        to: fitsManager.pixelMax
+                        value: fitsManager.maxValue
+                        stepSize: 1.0
+                        onMoved: fitsManager.maxValue = value
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                color: Material.color(Material.Grey, Material.Shade200)
+            }
+
+            Pane {
+                Layout.fillWidth: true
+                padding: 16
+                topPadding: 12
+                Material.elevation: 0
+
+                ColumnLayout {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Apply")
+                        onClicked: fitsManager.applyGrayTransform()
+                        Material.background: Material.accent
+                        Material.foreground: "white"
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Auto Adjust")
+                        flat: true
+                        onClicked: fitsManager.autoAdjust()
+                    }
+                }
+            }
+
+            Item { Layout.fillHeight: true }
         }
     }
 
