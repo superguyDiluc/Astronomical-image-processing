@@ -395,12 +395,13 @@ void FitsManager::autoAdjust()
     FitsData data = m_currentData;
     float pixelMax = m_pixelMax;
     m_displayWatcher.setFuture(QtConcurrent::run([this, data = std::move(data), pixelMax]() mutable {
-        DisplayResult result = buildAutoAdjustResult(std::move(data));
+        DisplayResult result = buildAutoAdjustResult(data);
         if (!result.errorMessage.isEmpty())
             return result;
         result.maxValue = std::min(result.maxValue, pixelMax);
         if (result.maxValue <= result.minValue)
             result.maxValue = result.minValue + 1.0f;
+        result.image = convertToQImage(data, result.minValue, result.maxValue);
         return result;
     }));
 }
@@ -465,6 +466,5 @@ FitsManager::DisplayResult FitsManager::buildAutoAdjustResult(FitsData data)
     // Set display window: background center as min, background + reasonable range as max
     result.minValue = med;
     result.maxValue = med + 12.0f * stddev;
-    result.image = convertToQImage(data, result.minValue, result.maxValue);
     return result;
 }
