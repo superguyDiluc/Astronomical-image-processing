@@ -1,5 +1,6 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QQuickStyle>
 
 #include "src/FitsImageProvider.h"
@@ -19,7 +20,7 @@ int main(int argc, char *argv[])
 
     auto *fitsManager = new FitsManager(&app);
     fitsManager->setImageProvider(imageProvider);
-    FitsManager::setInstance(fitsManager);
+    engine.rootContext()->setContextProperty(QStringLiteral("fitsManager"), fitsManager);
 
     QObject::connect(
         &engine,

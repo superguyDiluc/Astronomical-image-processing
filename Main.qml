@@ -17,7 +17,7 @@ ApplicationWindow {
     Material.theme: Material.Light
     Material.accent: Material.Indigo
 
-    readonly property bool hasImage: FitsManager.imageSource.length > 0
+    readonly property bool hasImage: fitsManager.imageSource.length > 0
     property bool grayPanelOpen: false
     readonly property bool compactLayout: width < 760
     readonly property color statusError: "#F44336"
@@ -25,14 +25,14 @@ ApplicationWindow {
     readonly property color statusReady: "#4CAF50"
 
     Component.onCompleted: {
-        if (FitsManager.errorMessage.length > 0)
+        if (fitsManager.errorMessage.length > 0)
             errorSnackbar.open()
     }
 
     Connections {
-        target: FitsManager
+        target: fitsManager
         function onErrorMessageChanged() {
-            if (FitsManager.errorMessage.length > 0)
+            if (fitsManager.errorMessage.length > 0)
                 errorSnackbar.open()
         }
     }
@@ -178,12 +178,12 @@ ApplicationWindow {
                     text: qsTr("Open a FITS file to begin")
                     font.pointSize: 14
                     color: Material.color(Material.Grey)
-                    visible: !root.hasImage && FitsManager.status !== "loading"
+                    visible: !root.hasImage && fitsManager.status !== "loading"
                 }
 
                 BusyIndicator {
                     anchors.centerIn: parent
-                    running: FitsManager.status === "loading"
+                    running: fitsManager.status === "loading"
                     visible: running
                 }
 
@@ -225,7 +225,7 @@ ApplicationWindow {
 
                     Image {
                         id: fitsImage
-                        source: FitsManager.imageSource
+                        source: fitsManager.imageSource
                         asynchronous: true
                         cache: false
                         fillMode: Image.PreserveAspectFit
@@ -303,6 +303,7 @@ ApplicationWindow {
 
                 GrayTransformPanel {
                     anchors.fill: parent
+                    fitsManager: fitsManager
                     onCloseRequested: root.grayPanelOpen = false
                 }
             }
@@ -329,8 +330,8 @@ ApplicationWindow {
                     Layout.preferredWidth: 8
                     Layout.preferredHeight: 8
                     radius: 4
-                    color: FitsManager.status === "error" ? root.statusError
-                         : FitsManager.status === "loading" ? root.statusLoading
+                    color: fitsManager.status === "error" ? root.statusError
+                         : fitsManager.status === "loading" ? root.statusLoading
                          : root.statusReady
 
                     Accessible.ignored: true
@@ -338,8 +339,8 @@ ApplicationWindow {
 
                 Label {
                     Layout.leftMargin: 6
-                    text: FitsManager.status === "error" ? qsTr("Error")
-                        : FitsManager.status === "loading" ? qsTr("Loading...")
+                    text: fitsManager.status === "error" ? qsTr("Error")
+                        : fitsManager.status === "loading" ? qsTr("Loading...")
                         : qsTr("Ready")
                     font.pointSize: 10
                     color: Material.color(Material.Grey, Material.Shade700)
@@ -359,7 +360,7 @@ ApplicationWindow {
                 title: qsTr("Select FITS file")
                 nameFilters: [qsTr("FITS files (*.fits *.fit *.fts)")]
                 onAccepted: {
-                    FitsManager.loadFile(selectedFile)
+                    fitsManager.loadFile(selectedFile)
                     fileDialog.active = false
                 }
                 onRejected: fileDialog.active = false
@@ -380,6 +381,7 @@ ApplicationWindow {
 
         GrayTransformPanel {
             anchors.fill: parent
+            fitsManager: fitsManager
             onCloseRequested: root.grayPanelOpen = false
         }
     }
@@ -401,7 +403,7 @@ ApplicationWindow {
                 padding: 0
 
                 onClosed: {
-                    FitsManager.clearError()
+                    fitsManager.clearError()
                     errorSnackbar.active = false
                 }
                 Component.onCompleted: open()
@@ -422,7 +424,7 @@ ApplicationWindow {
 
                         Label {
                             Layout.fillWidth: true
-                            text: FitsManager.errorMessage
+                            text: fitsManager.errorMessage
                             font.pointSize: 10
                             color: root.statusError
                             wrapMode: Text.WordWrap

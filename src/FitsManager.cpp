@@ -17,8 +17,6 @@
 
 // -- property accessors -------------------------------------------------------
 
-FitsManager *FitsManager::s_instance = nullptr;
-
 FitsManager::FitsManager(QObject *parent)
     : QObject(parent)
 {
@@ -63,18 +61,6 @@ FitsManager::FitsManager(QObject *parent)
         publishImage(result.image);
         setStatus(QStringLiteral("ready"));
     });
-}
-
-FitsManager *FitsManager::create(QQmlEngine *qmlEngine, QJSEngine *)
-{
-    Q_ASSERT(s_instance);
-    QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership);
-    return s_instance;
-}
-
-void FitsManager::setInstance(FitsManager *instance)
-{
-    s_instance = instance;
 }
 
 QString FitsManager::status() const { return m_status; }
