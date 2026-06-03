@@ -1,11 +1,11 @@
 import QtQuick
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import test
 
 ColumnLayout {
     id: root
 
-    required property var fitsManager
     property alias closeButton: closeButton
 
     signal closeRequested()
@@ -28,7 +28,7 @@ ColumnLayout {
 
         ToolButton {
             id: closeButton
-            icon.name: "close"
+            icon.source: "asserts/close.svg"
             icon.width: 16
             icon.height: 16
             onClicked: root.closeRequested()
@@ -74,11 +74,11 @@ ColumnLayout {
             Slider {
                 id: minSlider
                 Layout.fillWidth: true
-                from: root.fitsManager.pixelMin
-                to: root.fitsManager.pixelMax
-                value: root.fitsManager.minValue
+                from: FitsManager.pixelMin
+                to: FitsManager.pixelMax
+                value: FitsManager.minValue
                 stepSize: 1.0
-                onMoved: root.fitsManager.minValue = Math.min(value, root.fitsManager.maxValue)
+                onMoved: FitsManager.minValue = Math.min(value, FitsManager.maxValue)
             }
         }
     }
@@ -115,11 +115,11 @@ ColumnLayout {
             Slider {
                 id: maxSlider
                 Layout.fillWidth: true
-                from: root.fitsManager.pixelMin
-                to: root.fitsManager.pixelMax
-                value: root.fitsManager.maxValue
+                from: FitsManager.pixelMin
+                to: FitsManager.pixelMax
+                value: FitsManager.maxValue
                 stepSize: 1.0
-                onMoved: root.fitsManager.maxValue = Math.max(value, root.fitsManager.minValue)
+                onMoved: FitsManager.maxValue = Math.max(value, FitsManager.minValue)
             }
         }
     }
@@ -146,8 +146,8 @@ ColumnLayout {
             Button {
                 Layout.fillWidth: true
                 text: qsTr("Apply")
-                enabled: root.fitsManager.status !== "loading"
-                onClicked: root.fitsManager.applyGrayTransform()
+                enabled: FitsManager.status !== "loading"
+                onClicked: FitsManager.applyGrayTransform()
                 Material.background: Material.accent
                 Material.foreground: "white"
             }
@@ -155,9 +155,9 @@ ColumnLayout {
             Button {
                 Layout.fillWidth: true
                 text: qsTr("Auto Adjust")
-                enabled: root.fitsManager.status !== "loading"
+                enabled: FitsManager.status !== "loading"
                 flat: true
-                onClicked: root.fitsManager.autoAdjust()
+                onClicked: FitsManager.autoAdjust()
             }
         }
     }

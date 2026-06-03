@@ -37,6 +37,8 @@ qt_add_qml_module(apptest
         src/FitsManager.h
         src/FitsManager.cpp
     RESOURCES
+        asserts/close.svg
+        asserts/contrast.svg
         asserts/list.svg
 )
 

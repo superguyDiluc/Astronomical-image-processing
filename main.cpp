@@ -13,8 +13,13 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
 
+    // Create image provider and manager before QML loads
     auto *imageProvider = new FitsImageProvider;
     engine.addImageProvider(QStringLiteral("fits"), imageProvider);
+
+    auto *fitsManager = new FitsManager(&app);
+    fitsManager->setImageProvider(imageProvider);
+    FitsManager::setInstance(fitsManager);
 
     QObject::connect(
         &engine,
@@ -24,15 +29,6 @@ int main(int argc, char *argv[])
         Qt::QueuedConnection);
 
     engine.loadFromModule("test", "Main");
-
-    // Connect FitsManager instances to the shared image provider
-    const auto rootObjects = engine.rootObjects();
-    for (auto *root : rootObjects) {
-        auto *manager = root->findChild<FitsManager *>();
-        if (manager) {
-            manager->setImageProvider(imageProvider);
-        }
-    }
 
     return QGuiApplication::exec();
 }

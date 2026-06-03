@@ -17,17 +17,22 @@ ApplicationWindow {
     Material.theme: Material.Light
     Material.accent: Material.Indigo
 
-    readonly property bool hasImage: fitsManager.imageSource.length > 0
+    readonly property bool hasImage: FitsManager.imageSource.length > 0
     property bool grayPanelOpen: false
     readonly property bool compactLayout: width < 760
     readonly property color statusError: "#F44336"
     readonly property color statusLoading: "#FF9800"
     readonly property color statusReady: "#4CAF50"
 
-    FitsManager {
-        id: fitsManager
-        onErrorMessageChanged: {
-            if (errorMessage.length > 0)
+    Component.onCompleted: {
+        if (FitsManager.errorMessage.length > 0)
+            errorSnackbar.open()
+    }
+
+    Connections {
+        target: FitsManager
+        function onErrorMessageChanged() {
+            if (FitsManager.errorMessage.length > 0)
                 errorSnackbar.open()
         }
     }
@@ -126,7 +131,7 @@ ApplicationWindow {
                 }
 
                 ToolButton {
-                    icon.name: "close"
+                    icon.source: "asserts/close.svg"
                     icon.width: 18
                     icon.height: 18
                     onClicked: sidebar.close()
@@ -142,7 +147,6 @@ ApplicationWindow {
 
             ItemDelegate {
                 Layout.fillWidth: true
-                icon.name: "folder-open"
                 text: qsTr("Load FITS")
                 onClicked: {
                     fileDialog.open()
@@ -174,7 +178,13 @@ ApplicationWindow {
                     text: qsTr("Open a FITS file to begin")
                     font.pointSize: 14
                     color: Material.color(Material.Grey)
-                    visible: !root.hasImage
+                    visible: !root.hasImage && FitsManager.status !== "loading"
+                }
+
+                BusyIndicator {
+                    anchors.centerIn: parent
+                    running: FitsManager.status === "loading"
+                    visible: running
                 }
 
                 Flickable {
@@ -183,28 +193,30 @@ ApplicationWindow {
                     anchors.margins: 16
                     visible: root.hasImage
                     clip: true
-                    contentWidth: fitsImage.width * fitsImage.scale
-                    contentHeight: fitsImage.height * fitsImage.scale
+                    contentWidth: fitsImage.width
+                    contentHeight: fitsImage.height
                     boundsBehavior: Flickable.StopAtBounds
                     interactive: root.hasImage
+                    ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
                     function resetView() {
-                        fitsImage.scale = fitsImage.fitScale
+                        fitsImage.zoom = fitsImage.fitScale
                         contentX = 0
                         contentY = 0
                     }
 
                     function zoomAt(point, factor) {
-                        let oldScale = fitsImage.scale
-                        let newScale = Math.max(0.05, Math.min(oldScale * factor, 20.0))
-                        if (Math.abs(newScale - oldScale) < 0.0001)
+                        let oldZoom = fitsImage.zoom
+                        let newZoom = Math.max(0.05, Math.min(oldZoom * factor, 20.0))
+                        if (Math.abs(newZoom - oldZoom) < 0.0001)
                             return
 
-                        let imageX = (contentX + point.x) / oldScale
-                        let imageY = (contentY + point.y) / oldScale
-                        fitsImage.scale = newScale
-                        contentX = Math.max(0, Math.min(imageX * newScale - point.x, contentWidth - width))
-                        contentY = Math.max(0, Math.min(imageY * newScale - point.y, contentHeight - height))
+                        let imageX = (contentX + point.x) / oldZoom
+                        let imageY = (contentY + point.y) / oldZoom
+                        fitsImage.zoom = newZoom
+                        contentX = Math.max(0, Math.min(imageX * newZoom - point.x, contentWidth - width))
+                        contentY = Math.max(0, Math.min(imageY * newZoom - point.y, contentHeight - height))
                     }
 
                     function zoomCenter(factor) {
@@ -213,24 +225,22 @@ ApplicationWindow {
 
                     Image {
                         id: fitsImage
-                        source: fitsManager.imageSource
+                        source: FitsManager.imageSource
                         asynchronous: true
                         cache: false
                         fillMode: Image.PreserveAspectFit
-                        transformOrigin: Item.TopLeft
-
                         readonly property real fitScale: Math.min(
                             flickable.width / Math.max(sourceSize.width, 1),
                             flickable.height / Math.max(sourceSize.height, 1),
                             1.0)
+                        property real zoom: fitScale
 
-                        width: sourceSize.width
-                        height: sourceSize.height
-                        scale: fitScale
+                        width: sourceSize.width * zoom
+                        height: sourceSize.height * zoom
 
                         onStatusChanged: {
                             if (status === Image.Ready)
-                                scale = fitScale
+                                zoom = fitScale
                         }
                     }
 
@@ -240,12 +250,6 @@ ApplicationWindow {
                             let factor = event.angleDelta.y > 0 ? 1.15 : (1 / 1.15)
                             flickable.zoomAt(Qt.point(event.x, event.y), factor)
                         }
-                    }
-
-                    BusyIndicator {
-                        anchors.centerIn: parent
-                        running: fitsManager.status === "loading"
-                        visible: running
                     }
                 }
 
@@ -272,7 +276,7 @@ ApplicationWindow {
 
                     ToolButton {
                         Layout.alignment: Qt.AlignHCenter
-                        icon.name: "tonality"
+                        icon.source: "asserts/contrast.svg"
                         icon.width: 22
                         icon.height: 22
                         checked: root.grayPanelOpen
@@ -299,7 +303,6 @@ ApplicationWindow {
 
                 GrayTransformPanel {
                     anchors.fill: parent
-                    fitsManager: fitsManager
                     onCloseRequested: root.grayPanelOpen = false
                 }
             }
@@ -326,8 +329,8 @@ ApplicationWindow {
                     Layout.preferredWidth: 8
                     Layout.preferredHeight: 8
                     radius: 4
-                    color: fitsManager.status === "error" ? root.statusError
-                         : fitsManager.status === "loading" ? root.statusLoading
+                    color: FitsManager.status === "error" ? root.statusError
+                         : FitsManager.status === "loading" ? root.statusLoading
                          : root.statusReady
 
                     Accessible.ignored: true
@@ -335,8 +338,8 @@ ApplicationWindow {
 
                 Label {
                     Layout.leftMargin: 6
-                    text: fitsManager.status === "error" ? qsTr("Error")
-                        : fitsManager.status === "loading" ? qsTr("Loading...")
+                    text: FitsManager.status === "error" ? qsTr("Error")
+                        : FitsManager.status === "loading" ? qsTr("Loading...")
                         : qsTr("Ready")
                     font.pointSize: 10
                     color: Material.color(Material.Grey, Material.Shade700)
@@ -356,7 +359,7 @@ ApplicationWindow {
                 title: qsTr("Select FITS file")
                 nameFilters: [qsTr("FITS files (*.fits *.fit *.fts)")]
                 onAccepted: {
-                    fitsManager.loadFile(selectedFile)
+                    FitsManager.loadFile(selectedFile)
                     fileDialog.active = false
                 }
                 onRejected: fileDialog.active = false
@@ -377,7 +380,6 @@ ApplicationWindow {
 
         GrayTransformPanel {
             anchors.fill: parent
-            fitsManager: fitsManager
             onCloseRequested: root.grayPanelOpen = false
         }
     }
@@ -399,7 +401,7 @@ ApplicationWindow {
                 padding: 0
 
                 onClosed: {
-                    fitsManager.clearError()
+                    FitsManager.clearError()
                     errorSnackbar.active = false
                 }
                 Component.onCompleted: open()
@@ -420,7 +422,7 @@ ApplicationWindow {
 
                         Label {
                             Layout.fillWidth: true
-                            text: fitsManager.errorMessage
+                            text: FitsManager.errorMessage
                             font.pointSize: 10
                             color: root.statusError
                             wrapMode: Text.WordWrap

@@ -15,6 +15,7 @@ class FitsManager : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
+    QML_SINGLETON
 
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
@@ -27,6 +28,11 @@ class FitsManager : public QObject
 
 public:
     explicit FitsManager(QObject *parent = nullptr);
+
+    // Foreign singleton factory: called by QML engine, returns the
+    // pre-configured instance that main.cpp created.
+    static FitsManager *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
+    static void setInstance(FitsManager *instance);
 
     QString status() const;
     QString errorMessage() const;
@@ -79,14 +85,14 @@ private:
         bool updateRange = false;
     };
 
-    FitsData readFits2dHdu(const QString &filePath);
-    QString writeTempPrimaryFits(const FitsData &data);
-    QImage convertToQImage(const FitsData &data, float displayMin, float displayMax);
-    DisplayResult buildAutoAdjustResult(FitsData data);
-    LoadResult buildLoadResult(const QString &filePath);
+    static FitsData readFits2dHdu(const QString &filePath);
+    static QString writeTempPrimaryFits(const FitsData &data);
+    static QImage convertToQImage(const FitsData &data, float displayMin, float displayMax);
+    static DisplayResult buildAutoAdjustResult(FitsData data);
+    static LoadResult buildLoadResult(const QString &filePath);
     void publishImage(const QImage &image);
     void startDisplayTask(float displayMin, float displayMax, bool updateRange);
-    void computePixelRange(const FitsData &data, float *pixelMin, float *pixelMax) const;
+    static void computePixelRange(const FitsData &data, float *pixelMin, float *pixelMax);
     bool operationInProgress() const;
 
     FitsImageProvider *m_provider = nullptr;
@@ -104,6 +110,8 @@ private:
 
     QFutureWatcher<LoadResult> m_loadWatcher;
     QFutureWatcher<DisplayResult> m_displayWatcher;
+
+    static FitsManager *s_instance;
 
     void setStatus(const QString &status);
     void setErrorMessage(const QString &message);

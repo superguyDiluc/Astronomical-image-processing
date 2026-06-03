@@ -17,6 +17,8 @@
 
 // -- property accessors -------------------------------------------------------
 
+FitsManager *FitsManager::s_instance = nullptr;
+
 FitsManager::FitsManager(QObject *parent)
     : QObject(parent)
 {
@@ -61,6 +63,18 @@ FitsManager::FitsManager(QObject *parent)
         publishImage(result.image);
         setStatus(QStringLiteral("ready"));
     });
+}
+
+FitsManager *FitsManager::create(QQmlEngine *qmlEngine, QJSEngine *)
+{
+    Q_ASSERT(s_instance);
+    QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership);
+    return s_instance;
+}
+
+void FitsManager::setInstance(FitsManager *instance)
+{
+    s_instance = instance;
 }
 
 QString FitsManager::status() const { return m_status; }
@@ -116,7 +130,7 @@ void FitsManager::setMaxValue(float value)
 
 // -- pixel range --------------------------------------------------------------
 
-void FitsManager::computePixelRange(const FitsData &data, float *pixelMin, float *pixelMax) const
+void FitsManager::computePixelRange(const FitsData &data, float *pixelMin, float *pixelMax)
 {
     if (data.rawPixels.empty())
         return;
@@ -288,8 +302,14 @@ QImage FitsManager::convertToQImage(const FitsData &data,
 
 void FitsManager::publishImage(const QImage &image)
 {
-    if (image.isNull() || !m_provider)
+    if (image.isNull())
         return;
+
+    if (!m_provider) {
+        setErrorMessage(tr("Image provider is not initialized."));
+        setStatus(QStringLiteral("error"));
+        return;
+    }
 
     m_provider->updateImage(image);
 
@@ -334,7 +354,7 @@ void FitsManager::startDisplayTask(float displayMin, float displayMax, bool upda
     setStatus(QStringLiteral("loading"));
 
     FitsData data = m_currentData;
-    m_displayWatcher.setFuture(QtConcurrent::run([this, data = std::move(data), displayMin, displayMax, updateRange]() mutable {
+    m_displayWatcher.setFuture(QtConcurrent::run([data = std::move(data), displayMin, displayMax, updateRange]() mutable {
         DisplayResult result;
         result.minValue = displayMin;
         result.maxValue = displayMax;
@@ -352,6 +372,12 @@ void FitsManager::startDisplayTask(float displayMin, float displayMax, bool upda
 
 void FitsManager::loadFile(const QUrl &fileUrl)
 {
+    if (!m_provider) {
+        setErrorMessage(tr("Image provider is not initialized."));
+        setStatus(QStringLiteral("error"));
+        return;
+    }
+
     if (operationInProgress()) {
         setErrorMessage(tr("Another image operation is already running."));
         return;
@@ -367,7 +393,7 @@ void FitsManager::loadFile(const QUrl &fileUrl)
         return;
     }
 
-    m_loadWatcher.setFuture(QtConcurrent::run([this, filePath]() {
+    m_loadWatcher.setFuture(QtConcurrent::run([filePath]() {
         return buildLoadResult(filePath);
     }));
 }
@@ -394,7 +420,7 @@ void FitsManager::autoAdjust()
 
     FitsData data = m_currentData;
     float pixelMax = m_pixelMax;
-    m_displayWatcher.setFuture(QtConcurrent::run([this, data = std::move(data), pixelMax]() mutable {
+    m_displayWatcher.setFuture(QtConcurrent::run([data = std::move(data), pixelMax]() mutable {
         DisplayResult result = buildAutoAdjustResult(data);
         if (!result.errorMessage.isEmpty())
             return result;
@@ -419,7 +445,7 @@ FitsManager::DisplayResult FitsManager::buildAutoAdjustResult(FitsData data)
     }
 
     if (values.empty()) {
-        result.errorMessage = tr("Image has no valid pixels.");
+        result.errorMessage = QStringLiteral("Image has no valid pixels.");
         return result;
     }
 
