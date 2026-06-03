@@ -18,12 +18,16 @@ set(TESTS OFF CACHE BOOL "" FORCE)
 set(USE_BZIP2 OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(cfitsio)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 QuickLayouts Concurrent)
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 QuickLayouts Concurrent Network)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(apptest
     main.cpp
+    src/AstrometryManager.h
+    src/AstrometryManager.cpp
+    src/AstrometryResult.h
+    src/AstrometryResult.cpp
     src/FitsImageProvider.h
     src/FitsImageProvider.cpp
 )
@@ -54,7 +58,7 @@ set_target_properties(apptest PROPERTIES
 )
 
 target_link_libraries(apptest
-    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::QuickLayouts Qt6::Concurrent cfitsio
+    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::QuickLayouts Qt6::Concurrent Qt6::Network cfitsio
 )
 
 target_include_directories(apptest PRIVATE ${cfitsio_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)

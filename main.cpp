@@ -3,12 +3,15 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 
+#include "src/AstrometryManager.h"
 #include "src/FitsImageProvider.h"
 #include "src/FitsManager.h"
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
+    QCoreApplication::setOrganizationName(QStringLiteral("AstronomicalImageProcessing"));
+    QCoreApplication::setApplicationName(QStringLiteral("FitsViewer"));
 
     QQuickStyle::setStyle("Material");
 
@@ -21,6 +24,9 @@ int main(int argc, char *argv[])
     auto *fitsManager = new FitsManager(&app);
     fitsManager->setImageProvider(imageProvider);
     engine.rootContext()->setContextProperty(QStringLiteral("fitsManager"), fitsManager);
+
+    auto *astrometryManager = new AstrometryManager(&app);
+    engine.rootContext()->setContextProperty(QStringLiteral("astrometryManager"), astrometryManager);
 
     QObject::connect(
         &engine,

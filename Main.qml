@@ -37,6 +37,14 @@ ApplicationWindow {
         }
     }
 
+    Connections {
+        target: astrometryManager
+        function onErrorMessageChanged() {
+            if (astrometryManager.errorMessage.length > 0)
+                astrometryProgress.open()
+        }
+    }
+
     Shortcut {
         sequence: "Ctrl+O"
         onActivated: fileDialog.open()
@@ -150,6 +158,26 @@ ApplicationWindow {
                 text: qsTr("Load FITS")
                 onClicked: {
                     fileDialog.open()
+                    sidebar.close()
+                }
+            }
+
+            ItemDelegate {
+                Layout.fillWidth: true
+                text: qsTr("Manage Astrometry API")
+                onClicked: {
+                    apiDialog.open()
+                    sidebar.close()
+                }
+            }
+
+            ItemDelegate {
+                Layout.fillWidth: true
+                text: qsTr("Submit to Astrometry.net")
+                enabled: fitsManager.tempFitsPath.length > 0 && !astrometryManager.running
+                onClicked: {
+                    astrometryProgress.open()
+                    astrometryManager.submitFits(fitsManager.tempFitsPath)
                     sidebar.close()
                 }
             }
@@ -338,6 +366,48 @@ ApplicationWindow {
 
                 Item { Layout.fillWidth: true }
 
+                RowLayout {
+                    Layout.rightMargin: 16
+                    spacing: 6
+
+                    Rectangle {
+                        Layout.preferredWidth: 8
+                        Layout.preferredHeight: 8
+                        radius: 4
+                        color: astrometryManager.apiKeyConfigured ? root.statusReady : root.statusError
+                        Accessible.ignored: true
+                    }
+
+                    Label {
+                        text: astrometryManager.apiKeyConfigured ? qsTr("API configured") : qsTr("API missing")
+                        font.pointSize: 10
+                        color: Material.color(Material.Grey, Material.Shade700)
+                    }
+                }
+
+                RowLayout {
+                    Layout.rightMargin: 16
+                    spacing: 6
+                    visible: astrometryManager.running || astrometryManager.status === "success" || astrometryManager.status === "failed"
+
+                    BusyIndicator {
+                        Layout.preferredWidth: 16
+                        Layout.preferredHeight: 16
+                        running: astrometryManager.running
+                        visible: running
+                    }
+
+                    Label {
+                        text: astrometryManager.running
+                            ? qsTr("Astrometry %1%").arg(Math.round(astrometryManager.progress * 100))
+                            : astrometryManager.status === "success" ? qsTr("Astrometry done")
+                            : astrometryManager.status === "failed" ? qsTr("Astrometry failed")
+                            : ""
+                        font.pointSize: 10
+                        color: Material.color(Material.Grey, Material.Shade700)
+                    }
+                }
+
                 Rectangle {
                     Layout.preferredWidth: 8
                     Layout.preferredHeight: 8
@@ -356,6 +426,147 @@ ApplicationWindow {
                         : qsTr("Ready")
                     font.pointSize: 10
                     color: Material.color(Material.Grey, Material.Shade700)
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: apiDialog
+        title: qsTr("Astrometry.net API")
+        modal: true
+        standardButtons: Dialog.NoButton
+        width: Math.min(root.width - 48, 440)
+        x: (root.width - width) / 2
+        y: Math.max(48, (root.height - height) / 2)
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                text: astrometryManager.apiKeyConfigured
+                    ? qsTr("API key configured: %1").arg(astrometryManager.apiKeyPreview())
+                    : qsTr("API key is not configured.")
+                wrapMode: Text.WordWrap
+            }
+
+            TextField {
+                id: apiKeyField
+                Layout.fillWidth: true
+                echoMode: TextInput.Password
+                placeholderText: qsTr("Astrometry.net API key")
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Button {
+                    text: qsTr("Save")
+                    enabled: apiKeyField.text.trim().length > 0
+                    onClicked: {
+                        astrometryManager.saveApiKey(apiKeyField.text)
+                        apiKeyField.clear()
+                        apiDialog.close()
+                    }
+                }
+
+                Button {
+                    text: qsTr("Clear")
+                    flat: true
+                    enabled: astrometryManager.apiKeyConfigured
+                    onClicked: {
+                        astrometryManager.clearApiKey()
+                        apiKeyField.clear()
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: qsTr("Close")
+                    flat: true
+                    onClicked: apiDialog.close()
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: astrometryProgress
+        title: qsTr("Astrometry.net Solve")
+        modal: false
+        standardButtons: Dialog.NoButton
+        width: Math.min(root.width - 48, 520)
+        x: (root.width - width) / 2
+        y: Math.max(48, root.height - height - 72)
+
+        function openForCurrentTask() { open() }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+
+            Label {
+                Layout.fillWidth: true
+                text: astrometryManager.stageText
+                font.weight: Font.Medium
+                wrapMode: Text.WordWrap
+            }
+
+            ProgressBar {
+                Layout.fillWidth: true
+                from: 0
+                to: 1
+                indeterminate: astrometryManager.running && astrometryManager.progress < 0.05
+                value: astrometryManager.progress
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Elapsed: %1s%2%3")
+                    .arg(astrometryManager.elapsedSeconds)
+                    .arg(astrometryManager.subId.length > 0 ? qsTr("  SubID: %1").arg(astrometryManager.subId) : "")
+                    .arg(astrometryManager.jobId.length > 0 ? qsTr("  JobID: %1").arg(astrometryManager.jobId) : "")
+                font.pointSize: 10
+                color: Material.color(Material.Grey, Material.Shade700)
+                wrapMode: Text.WordWrap
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: astrometryManager.outputDir.length > 0 ? qsTr("Saved to: %1").arg(astrometryManager.outputDir) : ""
+                visible: text.length > 0
+                font.pointSize: 10
+                color: Material.color(Material.Grey, Material.Shade700)
+                wrapMode: Text.WordWrap
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: astrometryManager.errorMessage
+                visible: text.length > 0
+                color: root.statusError
+                wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Button {
+                    text: qsTr("Cancel")
+                    visible: astrometryManager.running
+                    onClicked: astrometryManager.cancel()
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: qsTr("Close")
+                    flat: true
+                    enabled: !astrometryManager.running
+                    onClicked: astrometryProgress.close()
                 }
             }
         }
