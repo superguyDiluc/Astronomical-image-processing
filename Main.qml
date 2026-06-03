@@ -193,14 +193,16 @@ ApplicationWindow {
                     anchors.margins: 16
                     visible: root.hasImage
                     clip: true
-                    contentWidth: fitsImage.width
-                    contentHeight: fitsImage.height
+                    contentWidth: Math.max(width, fitsImage.width)
+                    contentHeight: Math.max(height, fitsImage.height)
                     boundsBehavior: Flickable.StopAtBounds
                     interactive: root.hasImage
+                    property bool followsFitScale: true
                     ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
                     function resetView() {
+                        followsFitScale = true
                         fitsImage.zoom = fitsImage.fitScale
                         contentX = 0
                         contentY = 0
@@ -212,11 +214,14 @@ ApplicationWindow {
                         if (Math.abs(newZoom - oldZoom) < 0.0001)
                             return
 
-                        let imageX = (contentX + point.x) / oldZoom
-                        let imageY = (contentY + point.y) / oldZoom
+                        followsFitScale = false
+                        let oldImageX = fitsImage.x
+                        let oldImageY = fitsImage.y
+                        let imageX = (contentX + point.x - oldImageX) / oldZoom
+                        let imageY = (contentY + point.y - oldImageY) / oldZoom
                         fitsImage.zoom = newZoom
-                        contentX = Math.max(0, Math.min(imageX * newZoom - point.x, contentWidth - width))
-                        contentY = Math.max(0, Math.min(imageY * newZoom - point.y, contentHeight - height))
+                        contentX = Math.max(0, Math.min(fitsImage.x + imageX * newZoom - point.x, contentWidth - width))
+                        contentY = Math.max(0, Math.min(fitsImage.y + imageY * newZoom - point.y, contentHeight - height))
                     }
 
                     function zoomCenter(factor) {
@@ -237,10 +242,17 @@ ApplicationWindow {
 
                         width: sourceSize.width * zoom
                         height: sourceSize.height * zoom
+                        x: Math.max(0, (flickable.contentWidth - width) / 2)
+                        y: Math.max(0, (flickable.contentHeight - height) / 2)
 
                         onStatusChanged: {
                             if (status === Image.Ready)
-                                zoom = fitScale
+                                flickable.resetView()
+                        }
+
+                        onFitScaleChanged: {
+                            if (flickable.followsFitScale)
+                                flickable.resetView()
                         }
                     }
 
