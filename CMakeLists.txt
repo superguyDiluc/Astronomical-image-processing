@@ -32,6 +32,7 @@ qt_add_qml_module(apptest
     URI test
     QML_FILES
         Main.qml
+        GrayTransformPanel.qml
     SOURCES
         src/FitsManager.h
         src/FitsManager.cpp

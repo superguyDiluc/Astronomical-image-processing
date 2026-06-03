@@ -20,12 +20,54 @@ ApplicationWindow {
     readonly property bool hasImage: fitsManager.imageSource.length > 0
     property bool grayPanelOpen: false
     readonly property bool compactLayout: width < 760
+    readonly property color statusError: "#F44336"
+    readonly property color statusLoading: "#FF9800"
+    readonly property color statusReady: "#4CAF50"
 
     FitsManager {
         id: fitsManager
         onErrorMessageChanged: {
             if (errorMessage.length > 0)
                 errorSnackbar.open()
+        }
+    }
+
+    Shortcut {
+        sequence: "Ctrl+O"
+        onActivated: fileDialog.open()
+    }
+
+    Shortcut {
+        sequence: "+"
+        enabled: root.hasImage
+        onActivated: flickable.zoomCenter(1.15)
+    }
+
+    Shortcut {
+        sequence: "="
+        enabled: root.hasImage
+        onActivated: flickable.zoomCenter(1.15)
+    }
+
+    Shortcut {
+        sequence: "-"
+        enabled: root.hasImage
+        onActivated: flickable.zoomCenter(1 / 1.15)
+    }
+
+    Shortcut {
+        sequence: "0"
+        enabled: root.hasImage
+        onActivated: flickable.resetView()
+    }
+
+    Shortcut {
+        sequence: "Esc"
+        onActivated: {
+            if (root.grayPanelOpen)
+                root.grayPanelOpen = false
+            else if (sidebar.opened)
+                sidebar.close()
         }
     }
 
@@ -165,6 +207,10 @@ ApplicationWindow {
                         contentY = Math.max(0, Math.min(imageY * newScale - point.y, contentHeight - height))
                     }
 
+                    function zoomCenter(factor) {
+                        zoomAt(Qt.point(width / 2, height / 2), factor)
+                    }
+
                     Image {
                         id: fitsImage
                         source: fitsManager.imageSource
@@ -251,156 +297,10 @@ ApplicationWindow {
                 padding: 0
                 Material.elevation: 1
 
-                ColumnLayout {
+                GrayTransformPanel {
                     anchors.fill: parent
-                    spacing: 0
-
-                    // Panel header
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 44
-                        spacing: 0
-
-                        Label {
-                            Layout.fillWidth: true
-                            Layout.leftMargin: 16
-                            text: qsTr("Gray Level Transform")
-                            font.pointSize: 12
-                            font.weight: Font.Medium
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        ToolButton {
-                            icon.name: "close"
-                            icon.width: 16
-                            icon.height: 16
-                            onClicked: root.grayPanelOpen = false
-                            Accessible.name: qsTr("Close panel")
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 1
-                        color: Material.color(Material.Grey, Material.Shade300)
-                    }
-
-                    // Min slider
-                    Pane {
-                        Layout.fillWidth: true
-                        padding: 16
-                        topPadding: 12
-                        bottomPadding: 4
-                        Material.elevation: 0
-
-                        ColumnLayout {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            spacing: 4
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label {
-                                    text: qsTr("Min")
-                                    font.pointSize: 10
-                                }
-                                Item { Layout.fillWidth: true }
-                                Label {
-                                    text: Math.round(minSlider.value).toString()
-                                    font.pointSize: 10
-                                    color: Material.color(Material.Grey, Material.Shade600)
-                                }
-                            }
-
-                            Slider {
-                                id: minSlider
-                                Layout.fillWidth: true
-                                from: fitsManager.pixelMin
-                                to: fitsManager.pixelMax
-                                value: fitsManager.minValue
-                                stepSize: 1.0
-                                onMoved: fitsManager.minValue = value
-                            }
-                        }
-                    }
-
-                    // Max slider
-                    Pane {
-                        Layout.fillWidth: true
-                        padding: 16
-                        topPadding: 4
-                        bottomPadding: 12
-                        Material.elevation: 0
-
-                        ColumnLayout {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            spacing: 4
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label {
-                                    text: qsTr("Max")
-                                    font.pointSize: 10
-                                }
-                                Item { Layout.fillWidth: true }
-                                Label {
-                                    text: Math.round(maxSlider.value).toString()
-                                    font.pointSize: 10
-                                    color: Material.color(Material.Grey, Material.Shade600)
-                                }
-                            }
-
-                            Slider {
-                                id: maxSlider
-                                Layout.fillWidth: true
-                                from: fitsManager.pixelMin
-                                to: fitsManager.pixelMax
-                                value: fitsManager.maxValue
-                                stepSize: 1.0
-                                onMoved: fitsManager.maxValue = value
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 1
-                        Layout.leftMargin: 16
-                        Layout.rightMargin: 16
-                        color: Material.color(Material.Grey, Material.Shade200)
-                    }
-
-                    // Buttons
-                    Pane {
-                        Layout.fillWidth: true
-                        padding: 16
-                        topPadding: 12
-                        Material.elevation: 0
-
-                        ColumnLayout {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            spacing: 8
-
-                            Button {
-                                Layout.fillWidth: true
-                                text: qsTr("Apply")
-                                onClicked: fitsManager.applyGrayTransform()
-                                Material.background: Material.accent
-                                Material.foreground: "white"
-                            }
-
-                            Button {
-                                Layout.fillWidth: true
-                                text: qsTr("Auto Adjust")
-                                flat: true
-                                onClicked: fitsManager.autoAdjust()
-                            }
-                        }
-                    }
-
-                    Item { Layout.fillHeight: true }
+                    fitsManager: fitsManager
+                    onCloseRequested: root.grayPanelOpen = false
                 }
             }
         }
@@ -426,9 +326,9 @@ ApplicationWindow {
                     Layout.preferredWidth: 8
                     Layout.preferredHeight: 8
                     radius: 4
-                    color: fitsManager.status === "error" ? "#F44336"
-                         : fitsManager.status === "loading" ? "#FF9800"
-                         : "#4CAF50"
+                    color: fitsManager.status === "error" ? root.statusError
+                         : fitsManager.status === "loading" ? root.statusLoading
+                         : root.statusReady
 
                     Accessible.ignored: true
                 }
@@ -475,152 +375,10 @@ ApplicationWindow {
         visible: root.compactLayout && root.grayPanelOpen
         onClosed: root.grayPanelOpen = false
 
-        ColumnLayout {
+        GrayTransformPanel {
             anchors.fill: parent
-            spacing: 0
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 44
-                spacing: 0
-
-                Label {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 16
-                    text: qsTr("Gray Level Transform")
-                    font.pointSize: 12
-                    font.weight: Font.Medium
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                ToolButton {
-                    icon.name: "close"
-                    icon.width: 16
-                    icon.height: 16
-                    onClicked: root.grayPanelOpen = false
-                    Accessible.name: qsTr("Close panel")
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 1
-                color: Material.color(Material.Grey, Material.Shade300)
-            }
-
-            Pane {
-                Layout.fillWidth: true
-                padding: 16
-                topPadding: 12
-                bottomPadding: 4
-                Material.elevation: 0
-
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 4
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Label {
-                            text: qsTr("Min")
-                            font.pointSize: 10
-                        }
-                        Item { Layout.fillWidth: true }
-                        Label {
-                            text: Math.round(compactMinSlider.value).toString()
-                            font.pointSize: 10
-                            color: Material.color(Material.Grey, Material.Shade600)
-                        }
-                    }
-
-                    Slider {
-                        id: compactMinSlider
-                        Layout.fillWidth: true
-                        from: fitsManager.pixelMin
-                        to: fitsManager.pixelMax
-                        value: fitsManager.minValue
-                        stepSize: 1.0
-                        onMoved: fitsManager.minValue = value
-                    }
-                }
-            }
-
-            Pane {
-                Layout.fillWidth: true
-                padding: 16
-                topPadding: 4
-                bottomPadding: 12
-                Material.elevation: 0
-
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 4
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Label {
-                            text: qsTr("Max")
-                            font.pointSize: 10
-                        }
-                        Item { Layout.fillWidth: true }
-                        Label {
-                            text: Math.round(compactMaxSlider.value).toString()
-                            font.pointSize: 10
-                            color: Material.color(Material.Grey, Material.Shade600)
-                        }
-                    }
-
-                    Slider {
-                        id: compactMaxSlider
-                        Layout.fillWidth: true
-                        from: fitsManager.pixelMin
-                        to: fitsManager.pixelMax
-                        value: fitsManager.maxValue
-                        stepSize: 1.0
-                        onMoved: fitsManager.maxValue = value
-                    }
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 1
-                Layout.leftMargin: 16
-                Layout.rightMargin: 16
-                color: Material.color(Material.Grey, Material.Shade200)
-            }
-
-            Pane {
-                Layout.fillWidth: true
-                padding: 16
-                topPadding: 12
-                Material.elevation: 0
-
-                ColumnLayout {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 8
-
-                    Button {
-                        Layout.fillWidth: true
-                        text: qsTr("Apply")
-                        onClicked: fitsManager.applyGrayTransform()
-                        Material.background: Material.accent
-                        Material.foreground: "white"
-                    }
-
-                    Button {
-                        Layout.fillWidth: true
-                        text: qsTr("Auto Adjust")
-                        flat: true
-                        onClicked: fitsManager.autoAdjust()
-                    }
-                }
-            }
-
-            Item { Layout.fillHeight: true }
+            fitsManager: fitsManager
+            onCloseRequested: root.grayPanelOpen = false
         }
     }
 
@@ -664,7 +422,7 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             text: fitsManager.errorMessage
                             font.pointSize: 10
-                            color: "#F44336"
+                            color: root.statusError
                             wrapMode: Text.WordWrap
                             maximumLineCount: 3
                             elide: Text.ElideRight
