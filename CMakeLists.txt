@@ -18,7 +18,7 @@ set(TESTS OFF CACHE BOOL "" FORCE)
 set(USE_BZIP2 OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(cfitsio)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 QuickLayouts)
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 QuickLayouts Concurrent)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
@@ -51,7 +51,7 @@ set_target_properties(apptest PROPERTIES
 )
 
 target_link_libraries(apptest
-    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::QuickLayouts cfitsio
+    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::QuickLayouts Qt6::Concurrent cfitsio
 )
 
 target_include_directories(apptest PRIVATE ${cfitsio_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)

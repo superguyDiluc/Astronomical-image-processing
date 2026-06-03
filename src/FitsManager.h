@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QImage>
+#include <QFutureWatcher>
 #include <QObject>
 #include <QQmlEngine>
 #include <QString>
@@ -61,11 +62,32 @@ private:
         int height = 0;
     };
 
+    struct LoadResult {
+        FitsData data;
+        QString tempPath;
+        float pixelMin = 0.0f;
+        float pixelMax = 0.0f;
+        QImage image;
+        QString errorMessage;
+    };
+
+    struct DisplayResult {
+        float minValue = 0.0f;
+        float maxValue = 0.0f;
+        QImage image;
+        QString errorMessage;
+        bool updateRange = false;
+    };
+
     FitsData readFits2dHdu(const QString &filePath);
     QString writeTempPrimaryFits(const FitsData &data);
     QImage convertToQImage(const FitsData &data, float displayMin, float displayMax);
-    void refreshDisplay();
-    void computePixelRange();
+    DisplayResult buildAutoAdjustResult(FitsData data);
+    LoadResult buildLoadResult(const QString &filePath);
+    void publishImage(const QImage &image);
+    void startDisplayTask(float displayMin, float displayMax, bool updateRange);
+    void computePixelRange(const FitsData &data, float *pixelMin, float *pixelMax) const;
+    bool operationInProgress() const;
 
     FitsImageProvider *m_provider = nullptr;
     QString m_status = QStringLiteral("ready");
@@ -79,6 +101,9 @@ private:
     float m_maxValue = 65535.0f;
     float m_pixelMin = 0.0f;
     float m_pixelMax = 65535.0f;
+
+    QFutureWatcher<LoadResult> m_loadWatcher;
+    QFutureWatcher<DisplayResult> m_displayWatcher;
 
     void setStatus(const QString &status);
     void setErrorMessage(const QString &message);

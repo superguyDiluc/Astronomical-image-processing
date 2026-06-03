@@ -3,6 +3,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QtConcurrent>
 #include <QStandardPaths>
 
 #include <fitsio.h>
@@ -19,6 +20,47 @@
 FitsManager::FitsManager(QObject *parent)
     : QObject(parent)
 {
+    connect(&m_loadWatcher, &QFutureWatcher<LoadResult>::finished, this, [this]() {
+        LoadResult result = m_loadWatcher.result();
+        if (!result.errorMessage.isEmpty()) {
+            setErrorMessage(result.errorMessage);
+            setStatus(QStringLiteral("error"));
+            return;
+        }
+
+        m_currentData = std::move(result.data);
+
+        if (m_tempFitsPath != result.tempPath) {
+            m_tempFitsPath = result.tempPath;
+            emit tempFitsPathChanged();
+        }
+
+        m_pixelMin = result.pixelMin;
+        m_pixelMax = result.pixelMax;
+        emit pixelRangeChanged();
+
+        setMinValue(m_pixelMin);
+        setMaxValue(m_pixelMax);
+        publishImage(result.image);
+        setStatus(QStringLiteral("ready"));
+    });
+
+    connect(&m_displayWatcher, &QFutureWatcher<DisplayResult>::finished, this, [this]() {
+        DisplayResult result = m_displayWatcher.result();
+        if (!result.errorMessage.isEmpty()) {
+            setErrorMessage(result.errorMessage);
+            setStatus(QStringLiteral("error"));
+            return;
+        }
+
+        if (result.updateRange) {
+            setMinValue(result.minValue);
+            setMaxValue(result.maxValue);
+        }
+
+        publishImage(result.image);
+        setStatus(QStringLiteral("ready"));
+    });
 }
 
 QString FitsManager::status() const { return m_status; }
@@ -74,23 +116,24 @@ void FitsManager::setMaxValue(float value)
 
 // -- pixel range --------------------------------------------------------------
 
-void FitsManager::computePixelRange()
+void FitsManager::computePixelRange(const FitsData &data, float *pixelMin, float *pixelMax) const
 {
-    if (m_currentData.rawPixels.empty())
+    if (data.rawPixels.empty())
         return;
 
     float vMin = std::numeric_limits<float>::max();
     float vMax = std::numeric_limits<float>::lowest();
-    for (float v : m_currentData.rawPixels) {
+    for (float v : data.rawPixels) {
         if (!std::isfinite(v))
             continue;
         if (v < vMin) vMin = v;
         if (v > vMax) vMax = v;
     }
 
-    m_pixelMin = vMin;
-    m_pixelMax = vMax;
-    emit pixelRangeChanged();
+    if (pixelMin)
+        *pixelMin = vMin;
+    if (pixelMax)
+        *pixelMax = vMax;
 }
 
 // -- FITS reading -------------------------------------------------------------
@@ -243,16 +286,12 @@ QImage FitsManager::convertToQImage(const FitsData &data,
 
 // -- refresh display ----------------------------------------------------------
 
-void FitsManager::refreshDisplay()
+void FitsManager::publishImage(const QImage &image)
 {
-    if (m_currentData.rawPixels.empty() || !m_provider)
+    if (image.isNull() || !m_provider)
         return;
 
-    QImage qimage = convertToQImage(m_currentData, m_minValue, m_maxValue);
-    if (qimage.isNull())
-        return;
-
-    m_provider->updateImage(qimage);
+    m_provider->updateImage(image);
 
     ++m_imageVersion;
     QString newSource = QStringLiteral("image://fits/v%1").arg(m_imageVersion);
@@ -260,10 +299,64 @@ void FitsManager::refreshDisplay()
     emit imageSourceChanged();
 }
 
+FitsManager::LoadResult FitsManager::buildLoadResult(const QString &filePath)
+{
+    LoadResult result;
+    try {
+        result.data = readFits2dHdu(filePath);
+        result.tempPath = writeTempPrimaryFits(result.data);
+        computePixelRange(result.data, &result.pixelMin, &result.pixelMax);
+        result.image = convertToQImage(result.data, result.pixelMin, result.pixelMax);
+    } catch (const std::exception &e) {
+        result.errorMessage = QString::fromUtf8(e.what());
+    }
+    return result;
+}
+
+bool FitsManager::operationInProgress() const
+{
+    return m_loadWatcher.isRunning() || m_displayWatcher.isRunning();
+}
+
+void FitsManager::startDisplayTask(float displayMin, float displayMax, bool updateRange)
+{
+    if (m_currentData.rawPixels.empty()) {
+        setErrorMessage(tr("No image loaded."));
+        return;
+    }
+
+    if (operationInProgress()) {
+        setErrorMessage(tr("Another image operation is already running."));
+        return;
+    }
+
+    clearError();
+    setStatus(QStringLiteral("loading"));
+
+    FitsData data = m_currentData;
+    m_displayWatcher.setFuture(QtConcurrent::run([this, data = std::move(data), displayMin, displayMax, updateRange]() mutable {
+        DisplayResult result;
+        result.minValue = displayMin;
+        result.maxValue = displayMax;
+        result.updateRange = updateRange;
+        try {
+            result.image = convertToQImage(data, displayMin, displayMax);
+        } catch (const std::exception &e) {
+            result.errorMessage = QString::fromUtf8(e.what());
+        }
+        return result;
+    }));
+}
+
 // -- public slots -------------------------------------------------------------
 
 void FitsManager::loadFile(const QUrl &fileUrl)
 {
+    if (operationInProgress()) {
+        setErrorMessage(tr("Another image operation is already running."));
+        return;
+    }
+
     clearError();
     setStatus(QStringLiteral("loading"));
 
@@ -274,40 +367,14 @@ void FitsManager::loadFile(const QUrl &fileUrl)
         return;
     }
 
-    try {
-        m_currentData = readFits2dHdu(filePath);
-
-        // Write temp Primary-only FITS for astrometry.net
-        QString tempPath = writeTempPrimaryFits(m_currentData);
-        if (m_tempFitsPath != tempPath) {
-            m_tempFitsPath = tempPath;
-            emit tempFitsPathChanged();
-        }
-
-        // Compute pixel range and set initial min/max
-        computePixelRange();
-        setMinValue(m_pixelMin);
-        setMaxValue(m_pixelMax);
-
-        // Convert and display with linear stretch initially
-        refreshDisplay();
-        setStatus(QStringLiteral("ready"));
-
-    } catch (const std::exception &e) {
-        setErrorMessage(QString::fromUtf8(e.what()));
-        setStatus(QStringLiteral("error"));
-    }
+    m_loadWatcher.setFuture(QtConcurrent::run([this, filePath]() {
+        return buildLoadResult(filePath);
+    }));
 }
 
 void FitsManager::applyGrayTransform()
 {
-    if (m_currentData.rawPixels.empty()) {
-        setErrorMessage(tr("No image loaded."));
-        return;
-    }
-
-    clearError();
-    refreshDisplay();
+    startDisplayTask(m_minValue, m_maxValue, false);
 }
 
 void FitsManager::autoAdjust()
@@ -317,20 +384,42 @@ void FitsManager::autoAdjust()
         return;
     }
 
-    clearError();
+    if (operationInProgress()) {
+        setErrorMessage(tr("Another image operation is already running."));
+        return;
+    }
 
-    // Build histogram and find background peak via simple iterative clipping
-    // (mirrors the Python sky_background_stats approach)
+    clearError();
+    setStatus(QStringLiteral("loading"));
+
+    FitsData data = m_currentData;
+    float pixelMax = m_pixelMax;
+    m_displayWatcher.setFuture(QtConcurrent::run([this, data = std::move(data), pixelMax]() mutable {
+        DisplayResult result = buildAutoAdjustResult(std::move(data));
+        if (!result.errorMessage.isEmpty())
+            return result;
+        result.maxValue = std::min(result.maxValue, pixelMax);
+        if (result.maxValue <= result.minValue)
+            result.maxValue = result.minValue + 1.0f;
+        return result;
+    }));
+}
+
+FitsManager::DisplayResult FitsManager::buildAutoAdjustResult(FitsData data)
+{
+    DisplayResult result;
+    result.updateRange = true;
+
     std::vector<float> values;
-    values.reserve(m_currentData.rawPixels.size());
-    for (float v : m_currentData.rawPixels) {
+    values.reserve(data.rawPixels.size());
+    for (float v : data.rawPixels) {
         if (std::isfinite(v))
             values.push_back(v);
     }
 
     if (values.empty()) {
-        setErrorMessage(tr("Image has no valid pixels."));
-        return;
+        result.errorMessage = tr("Image has no valid pixels.");
+        return result;
     }
 
     std::sort(values.begin(), values.end());
@@ -374,12 +463,8 @@ void FitsManager::autoAdjust()
     }
 
     // Set display window: background center as min, background + reasonable range as max
-    float autoMin = med;
-    float autoMax = std::min(med + 12.0f * stddev, m_pixelMax);
-    if (autoMax <= autoMin)
-        autoMax = autoMin + 1.0f;
-
-    setMinValue(autoMin);
-    setMaxValue(autoMax);
-    refreshDisplay();
+    result.minValue = med;
+    result.maxValue = med + 12.0f * stddev;
+    result.image = convertToQImage(data, result.minValue, result.maxValue);
+    return result;
 }
