@@ -4,7 +4,6 @@ project(test VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_PREFIX_PATH "D:/app/Tools/Qt/6.11.1/mingw_64")
 
 include(FetchContent)
 FetchContent_Declare(
